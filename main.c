@@ -5,22 +5,36 @@
 #include <ws2tcpip.h>
 #include <winerror.h>
 
+#define DEFAULT_PORT 8086
 #define DEFAULT_BACKLOG 4
 
-SOCKET makeListenSock(struct addrinfo **ainfo) {
+int makePortAddrInfo(int port, int stype, struct addrinfo **out) {
     struct addrinfo hints;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_socktype = stype;
 
-    int port = 8086;
     char portbuf[32];
     sprintf(portbuf, "%hu", port);
 
-    struct addrinfo *addr = NULL;
-    int ret = getaddrinfo(NULL, portbuf, &hints, &addr);
+    int ret = getaddrinfo(NULL, portbuf, &hints, out);
     if (ret != 0) {
-        printf("[LSOCK] Could not call getaddrinfo (err = %i)\n", ret);
+        printf("[PADDRINFO] Could not call getaddrinfo (err = %i)\n", ret);
+        return -1;
+    }
+
+    return 0;
+}
+
+int makeIPAddrInfo(const char *ip, int stype, struct addrinfo **out) {
+    //TODO: Implement this, needed to create broadcast socket
+    return 0;
+}
+
+SOCKET makeListenSock(struct addrinfo **ainfo) {
+    struct addrinfo *addr = NULL;
+    if (makePortAddrInfo(DEFAULT_PORT, SOCK_STREAM, &addr) == -1) {
+        printf("[LSOCK] Invalid addrinfo for port %i\n", DEFAULT_PORT);
         return -1;
     }
 
