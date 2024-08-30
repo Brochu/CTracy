@@ -5,6 +5,40 @@
 #include <ws2tcpip.h>
 #include <winerror.h>
 
+#define DEFAULT_BACKLOG 4
+
+SOCKET makeListenSock(struct addrinfo **ainfo) {
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    int port = 8086;
+    char portbuf[32];
+    sprintf(portbuf, "%hu", port);
+
+    struct addrinfo *addr = NULL;
+    int ret = getaddrinfo(NULL, portbuf, &hints, &addr);
+    if (ret != 0) {
+        printf("[LSOCK] Could not call getaddrinfo (err = %i)\n", ret);
+        return -1;
+    }
+
+    SOCKET s = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+    if (s == -1) {
+        printf("[LSOCK] Could not create socket\n");
+        freeaddrinfo(addr);
+        return -1;
+    }
+
+    *ainfo = addr;
+    return s;
+}
+
+SOCKET handleBroadcastSetup() {
+    return (SOCKET)0;
+}
+
 int main(int argc, char **argv) {
     int outcode = 0;
     printf("[CTracy] starting program\n");
@@ -26,45 +60,34 @@ int main(int argc, char **argv) {
     //Third Goal, Figure out how to handle keep-alive requests?
     //Fourth Goal, organize data to send a message
     //TODO: Do we keep the app running with Raylib?
+    //Seems like we need to create a separate UDP socket to send initial broadcast message
+    //Then accept connections on the listen socket created beforehand
     // **************************
 
-    struct addrinfo hints;
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-
-    int port = 8086;
-    char portbuf[32];
-    sprintf(portbuf, "%hu", port);
-
     struct addrinfo *addr = NULL;
-    int ret = getaddrinfo(NULL, portbuf, &hints, &addr);
-    if (ret != 0) {
-        printf("[MAIN] Could not call getaddrinfo (err = %i)\n", ret);
-        return -1;
-    }
+    SOCKET lsocket = makeListenSock(&addr);
 
-    SOCKET s = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
-    if (s == -1) {
-        printf("[MAIN] Could not create socket\n");
-        outcode = -1;
-        goto cleanaddr;
-    }
-
-    ret = bind(s, addr->ai_addr, addr->ai_addrlen);
+    int ret = bind(lsocket, addr->ai_addr, addr->ai_addrlen);
     if (ret == -1) {
         printf("[MAIN] Could not bind socket\n");
+        freeaddrinfo(addr);
         outcode = -1;
         goto cleansock;
     }
+    ret = listen(lsocket, DEFAULT_BACKLOG);
+    if (ret == -1) {
+        printf("[MAIN] Could not listen on the socket\n");
+        freeaddrinfo(addr);
+        outcode = -1;
+        goto cleansock;
+    }
+    freeaddrinfo(addr);
 
     //TODO: Operations on connection
     printf("[MAIN] Operations on socket here ...\n");
 
 cleansock:
-    closesocket(s);
-cleanaddr:
-    freeaddrinfo(addr);
+    closesocket(lsocket);
 
     printf("[CTracy] Program end\n");
     return outcode;
