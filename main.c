@@ -8,7 +8,22 @@
 #define DEFAULT_PORT 8086
 #define DEFAULT_BACKLOG 4
 
-int makePortAddrInfo(int port, int stype, struct addrinfo **out) {
+// PLAN
+// **************************
+//TODO: First thing is to setup UDP broadcast socket
+//Look into WorkerThread to see how they do it
+//
+//First Goal, Find out if we can connect to Tracy server socket
+//-> Do we receieve any data?
+//Second Goal, Broadcast new app + Go through handshake process
+//Third Goal, Figure out how to handle keep-alive requests?
+//Fourth Goal, organize data to send a message
+//TODO: Do we keep the app running with Raylib?
+//Seems like we need to create a separate UDP socket to send initial broadcast message
+//Then accept connections on the listen socket created beforehand
+// **************************
+
+int makeAddrInfo(const char *ip, int port, int stype, struct addrinfo **out) {
     struct addrinfo hints;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
@@ -17,7 +32,7 @@ int makePortAddrInfo(int port, int stype, struct addrinfo **out) {
     char portbuf[32];
     sprintf(portbuf, "%hu", port);
 
-    int ret = getaddrinfo(NULL, portbuf, &hints, out);
+    int ret = getaddrinfo(ip, portbuf, &hints, out);
     if (ret != 0) {
         printf("[PADDRINFO] Could not call getaddrinfo (err = %i)\n", ret);
         return -1;
@@ -26,15 +41,11 @@ int makePortAddrInfo(int port, int stype, struct addrinfo **out) {
     return 0;
 }
 
-int makeIPAddrInfo(const char *ip, int stype, struct addrinfo **out) {
-    //TODO: Implement this, needed to create broadcast socket
-    return 0;
-}
-
-SOCKET makeListenSock(struct addrinfo **ainfo) {
+SOCKET makeListenSock(struct addrinfo **outinfo) {
     struct addrinfo *addr = NULL;
-    if (makePortAddrInfo(DEFAULT_PORT, SOCK_STREAM, &addr) == -1) {
+    if (makeAddrInfo(NULL, DEFAULT_PORT, SOCK_STREAM, &addr) == -1) {
         printf("[LSOCK] Invalid addrinfo for port %i\n", DEFAULT_PORT);
+        *outinfo = NULL;
         return -1;
     }
 
@@ -42,14 +53,31 @@ SOCKET makeListenSock(struct addrinfo **ainfo) {
     if (s == -1) {
         printf("[LSOCK] Could not create socket\n");
         freeaddrinfo(addr);
+        *outinfo = NULL;
         return -1;
     }
 
-    *ainfo = addr;
+    *outinfo = addr;
     return s;
 }
 
-SOCKET handleBroadcastSetup() {
+SOCKET makeBroadcastSock(struct addrinfo **outinfo) {
+    struct addrinfo *addr = NULL;
+    if (makeAddrInfo("255.255.255.255", DEFAULT_PORT, SOCK_DGRAM, &addr)) {
+        printf("[BSOCK] Invalid addrinfo for port %i", DEFAULT_PORT);
+        *outinfo = NULL;
+        return -1;
+    }
+
+    SOCKET s = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+    if (s == -1) {
+        printf("[BSOCK] Could not create socket\n");
+        freeaddrinfo(addr);
+        *outinfo = NULL;
+        return -1;
+    }
+
+    *outinfo = addr;
     return (SOCKET)0;
 }
 
@@ -63,20 +91,6 @@ int main(int argc, char **argv) {
         printf("Cannot init winsock.\n");
         return -1;
     }
-
-    // **************************
-    //TODO: First thing is to setup UDP broadcast socket
-    //Look into WorkerThread to see how they do it
-    //
-    //First Goal, Find out if we can connect to Tracy server socket
-    //-> Do we receieve any data?
-    //Second Goal, Broadcast new app + Go through handshake process
-    //Third Goal, Figure out how to handle keep-alive requests?
-    //Fourth Goal, organize data to send a message
-    //TODO: Do we keep the app running with Raylib?
-    //Seems like we need to create a separate UDP socket to send initial broadcast message
-    //Then accept connections on the listen socket created beforehand
-    // **************************
 
     struct addrinfo *addr = NULL;
     SOCKET lsocket = makeListenSock(&addr);
@@ -96,6 +110,7 @@ int main(int argc, char **argv) {
         goto cleansock;
     }
     freeaddrinfo(addr);
+    addr = NULL;
 
     //TODO: Operations on connection
     printf("[MAIN] Operations on socket here ...\n");
