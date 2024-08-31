@@ -77,8 +77,10 @@ SOCKET makeBroadcastSock(struct addrinfo **outinfo) {
         return -1;
     }
 
+    //TODO: need to call setsockopt here to setup SO_BROADCAST
+
     *outinfo = addr;
-    return (SOCKET)0;
+    return s;
 }
 
 int main(int argc, char **argv) {
@@ -86,38 +88,62 @@ int main(int argc, char **argv) {
     printf("[CTracy] starting program\n");
 
     WSADATA wsaData;
-    if(WSAStartup(MAKEWORD( 2, 2 ), &wsaData) != 0)
-    {
+    if(WSAStartup(MAKEWORD( 2, 2 ), &wsaData) != 0) {
         printf("Cannot init winsock.\n");
         return -1;
     }
 
     struct addrinfo *addr = NULL;
     SOCKET lsocket = makeListenSock(&addr);
+    if (lsocket == -1) {
+        printf("Cannot create listen socket.\n");
+        return -1;
+    }
 
     int ret = bind(lsocket, addr->ai_addr, addr->ai_addrlen);
     if (ret == -1) {
         printf("[MAIN] Could not bind socket\n");
         freeaddrinfo(addr);
         outcode = -1;
-        goto cleansock;
+        goto cleanlisten;
     }
     ret = listen(lsocket, DEFAULT_BACKLOG);
     if (ret == -1) {
         printf("[MAIN] Could not listen on the socket\n");
         freeaddrinfo(addr);
         outcode = -1;
-        goto cleansock;
+        goto cleanlisten;
     }
     freeaddrinfo(addr);
     addr = NULL;
 
+    SOCKET bsocket = makeBroadcastSock(&addr);
+    if (bsocket == -1) {
+        printf("[MAIN] Could not broadcast on the socket\n");
+        freeaddrinfo(addr);
+        outcode = -1;
+        goto cleanlisten;
+    }
+
+    const char *data = "Hello, World!";
+    size_t len = strlen(data);
+    if (send(bsocket, data, len, 0) == SOCKET_ERROR) {
+        //TODO: Check if error persists after SO_BROADCAST is properly set
+        int errcode = WSAGetLastError();
+        printf("[MAIN] Could not send data to broadcast (err = %i)\n", errcode);
+        freeaddrinfo(addr);
+        outcode = -1;
+        goto cleanbroadcast;
+    }
+
     //TODO: Operations on connection
     printf("[MAIN] Operations on socket here ...\n");
 
-cleansock:
+cleanbroadcast:
+    closesocket(bsocket);
+cleanlisten:
     closesocket(lsocket);
 
-    printf("[CTracy] Program end\n");
+    printf("[CTracy] Program end (outcode = %i)\n", outcode);
     return outcode;
 }
