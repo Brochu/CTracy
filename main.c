@@ -77,7 +77,13 @@ SOCKET makeBroadcastSock(struct addrinfo **outinfo) {
         return -1;
     }
 
-    //TODO: need to call setsockopt here to setup SO_BROADCAST
+    unsigned long bcast = 1;
+    if (setsockopt(s, SOL_SOCKET, SO_BROADCAST, (const char *)&bcast, sizeof(bcast)) == -1) {
+        printf("[BSOCK] Could not set socket options for broadcast\n");
+        freeaddrinfo(addr);
+        *outinfo = NULL;
+        return -1;
+    }
 
     *outinfo = addr;
     return s;
@@ -124,10 +130,39 @@ int main(int argc, char **argv) {
         outcode = -1;
         goto cleanlisten;
     }
+    //freeaddrinfo(addr);
+    //addr = NULL;
 
+    // Maybe this is not needed, reuse addr ptr we got from the creation function?
+    //unsigned int ip = 0;
+    //inet_pton(AF_INET, "255.255.255.255", &ip);
+
+    //struct sockaddr_in a;
+    //memset(&a, 0, sizeof(a));
+    //a.sin_family = AF_INET;
+    //a.sin_port = htons(8086);
+    //a.sin_addr.s_addr = ip;
+
+    /*
+     * Need to create a message of this format
+    enum : uint32_t { ProtocolVersion = 64 };
+    enum : uint16_t { BroadcastVersion = 3 };
+    DWORD pid = GetCurrentProcessId();
+    activeTime = -1;
+    listenPort = 8086 by default
+    struct BroadcastMessage
+    {
+        uint16_t broadcastVersion;
+        uint16_t listenPort;
+        uint32_t protocolVersion;
+        uint64_t pid;
+        int32_t activeTime;        // in seconds
+        char programName[WelcomeMessageProgramNameSize];
+    };
+    */
     const char *data = "Hello, World!";
     size_t len = strlen(data);
-    if (send(bsocket, data, len, 0) == SOCKET_ERROR) {
+    if (sendto(bsocket, data, len, 0, addr->ai_addr, sizeof(*addr->ai_addr)) == SOCKET_ERROR) {
         //TODO: Check if error persists after SO_BROADCAST is properly set
         int errcode = WSAGetLastError();
         printf("[MAIN] Could not send data to broadcast (err = %i)\n", errcode);
@@ -140,6 +175,8 @@ int main(int argc, char **argv) {
     printf("[MAIN] Operations on socket here ...\n");
 
 cleanbroadcast:
+    freeaddrinfo(addr);
+    addr = NULL;
     closesocket(bsocket);
 cleanlisten:
     closesocket(lsocket);
