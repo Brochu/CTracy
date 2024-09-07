@@ -135,6 +135,8 @@ int main(int argc, char **argv) {
     freeaddrinfo(addr);
     addr = NULL;
 
+    //TODO: Add logic here to accept new connections and handle separate sockets
+
     SOCKET bsocket = makeBroadcastSock(&addr);
     if (bsocket == -1) {
         printf("[MAIN] Could not broadcast on the socket\n");
@@ -168,6 +170,11 @@ int main(int argc, char **argv) {
     }
 
     //TODO: Operations on connection
+    // 1. Send broadcast message - Setup some logic to retry sending it if missed?
+    // 2. ReadRaw from newly accepted socket (8 bytes) (handshake)
+    // 3. Compare handshake with static data kept in program
+    // 4. Compare protocol version
+    // Should be okay for actualy communications with the server at that point?
     printf("[MAIN] Operations on socket here ...\n");
 
 cleanbroadcast:
