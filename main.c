@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 
 #define WIN32_LEAN_AND_MEAN
@@ -7,6 +8,16 @@
 
 #define DEFAULT_PORT 8086
 #define DEFAULT_BACKLOG 4
+#define PROGNAME_SIZE 64
+
+typedef struct {
+    uint16_t broadcastVersion;
+    uint16_t listenPort;
+    uint32_t protocolVersion;
+    uint64_t pid;
+    int32_t activeTime;        // in seconds
+    char programName[PROGNAME_SIZE];
+} broadcastmessage;
 
 // PLAN
 // **************************
@@ -130,36 +141,18 @@ int main(int argc, char **argv) {
         outcode = -1;
         goto cleanlisten;
     }
-    //freeaddrinfo(addr);
-    //addr = NULL;
 
-    // Maybe this is not needed, reuse addr ptr we got from the creation function?
-    //unsigned int ip = 0;
-    //inet_pton(AF_INET, "255.255.255.255", &ip);
-
-    //struct sockaddr_in a;
-    //memset(&a, 0, sizeof(a));
-    //a.sin_family = AF_INET;
-    //a.sin_port = htons(8086);
-    //a.sin_addr.s_addr = ip;
-
-    /*
-     * Need to create a message of this format
-    enum : uint32_t { ProtocolVersion = 64 };
-    enum : uint16_t { BroadcastVersion = 3 };
-    DWORD pid = GetCurrentProcessId();
-    activeTime = -1;
-    listenPort = 8086 by default
-    struct BroadcastMessage
-    {
-        uint16_t broadcastVersion;
-        uint16_t listenPort;
-        uint32_t protocolVersion;
-        uint64_t pid;
-        int32_t activeTime;        // in seconds
-        char programName[WelcomeMessageProgramNameSize];
+    broadcastmessage msg = {
+        // Default values
+        .protocolVersion = 64,
+        .broadcastVersion = 3,
+        .pid = GetCurrentProcessId(),
+        .activeTime = -1,
+        .listenPort = 8086,
+        .programName = "CTracy.exe",
     };
-    */
+    memset(msg.programName, 0, PROGNAME_SIZE);
+
     const char *data = "Hello, World!";
     size_t len = strlen(data);
     if (sendto(bsocket, data, len, 0, addr->ai_addr, sizeof(*addr->ai_addr)) == SOCKET_ERROR) {
