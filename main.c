@@ -163,8 +163,8 @@ int main(int argc, char **argv) {
     const char *data = "Hello, World!";
     size_t len = strlen(data);
     if (sendto(bsocket, data, len, 0, addr->ai_addr, sizeof(*addr->ai_addr)) == SOCKET_ERROR) {
-        //TODO: Check if error persists after SO_BROADCAST is properly set
         int errcode = WSAGetLastError();
+        outcode = errcode;
         printf("[MAIN] Could not send data to broadcast (err = %i)\n", errcode);
         freeaddrinfo(addr);
         outcode = -1;
