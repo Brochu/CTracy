@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
@@ -149,9 +150,11 @@ int main(int argc, char **argv) {
         .pid = GetCurrentProcessId(),
         .activeTime = -1,
         .listenPort = 8086,
-        .programName = "CTracy.exe",
+        .programName = "",
     };
     memset(msg.programName, 0, PROGNAME_SIZE);
+    strcpy_s(msg.programName, PROGNAME_SIZE, "CTracy.exe");
+    printf("[MAIN] ProgName = %s\n", msg.programName);
 
     const char *data = "Hello, World!";
     size_t len = strlen(data);
